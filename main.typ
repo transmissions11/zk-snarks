@@ -1,5 +1,4 @@
 #import "template.typ": *
-#let r(body) = s[#text(fill: red)[#body]]
 
 #let concat = math.class("normal", sym.bar.v.double)
 
@@ -37,7 +36,7 @@ The fields we'll use are almost all large _prime fields_,#s[Except for _extensio
   #note[Division works by multiplying by an inverse, e.g. in $FF_17$ since $3 dot 6 = 1$, $6$ is the inverse of $3$ and thus $1\/3 = 6$ and $5\/3 = 5 dot 6 = 13$, etc. Negatives work by wrapping around, e.g. $-1 = 16$ and $-5 = 12$ in $FF_17$.]
 ]
 
-*Why finite?* Because it means every value fits in a fixed number of bits while arithmetic is still exact. With e.g. rationals our numbers can explode in size over the rounds of our proof, and with floats we get rounding errors and a bunch of other nastiness.#s[Floats technically aren't a field at all, as floating point addition isn't associative, e.g. $(0.1 + 0.2) + 0.3 != 0.1 + (0.2 + 0.3)$.]
+*Why finite?* Because it means every value fits in a fixed number of bits while arithmetic is still exact. With e.g. rationals our numbers can explode in size over the rounds of our proof, and with floats we get rounding errors and a bunch of other nastiness.#s[Floats technically aren't a field at all, as floating point addition isn't associative.]
 
 *Why a prime?* The integers mod $n$ are only a field when $n$ is prime. Otherwise we end up with non-zero numbers without inverses, which breaks division. Many of our _soundness_ arguments#s[_Soundness_ being the guarantee that, with high probability, a cheating prover can't get a false claim accepted.] rely on the _Schwartz-Zippel lemma_ (more on this soon!), which only applies over fields. There are more exotic finite fields too, but integers mod $p$ are simple and generally performant on commodity CPUs and GPUs.
 
@@ -45,7 +44,7 @@ The fields we'll use are almost all large _prime fields_,#s[Except for _extensio
 
 The one issue with doing everything in a finite field is that we have to be careful to make sure our inputs and computed values don't wrap around $p$, but we won't worry about that here.
 
-= Tables / Multilinear extensions
+= Tables & Extensions
 
 #definition[Table][
 
@@ -339,9 +338,9 @@ With this technique, a cheating prover gets through with probability at most $el
 
 To be clear, nothing here is special to products. To prove $g(x) = P(f_1 (x), ..., f_k (x))$ for any polynomial $P$ of total degree $d$, we just sum-check $sum_x P(f_1 (x), ..., f_k (x)) dot "eq"_r (x)$ instead, which spits out $k$ claims, one for each $tilde(f)_i $. The round polynomials then have degree at most $d + 1$, so the bound becomes $(d + 2) ell\/abs(FF)$.
 
-= Proving matrix products <matmul>
+== Proving matmuls <matmul>
 
-The elementwise relations we learned to prove with sum-check only combine values across tables at the _same_ cell, but *matrix multiplication is different*. With a matmul, each cell of the output depends on a whole row of one input and a whole column of the other, so we can't prove it using the technique from @elementwisepoly out of the box.
+The elementwise relations we learned to prove so far with sum-check only combine values across tables at the _same_ cell, but *matrix multiplication is different*. With a matmul, each cell of the output depends on a whole row of one input and a whole column of the other, so we can't prove it using the technique from @elementwisepoly out of the box.
 
 #definition[Matrices as tables][
 
@@ -872,7 +871,7 @@ The cost is that rows now have $W + tau$ values, so with rate $rho$ the codeword
 
 Tails hide the opened columns, but the verifier still sees the row $G_r_"row"$ itself. As we saw, padding it would take $W$ pads per opening, so instead we'll hide it with a single mask row, committed alongside the data.
 
-Before committing, we'll have the prover append an extra row#s[Technically a few rows, not one, because a single base field row isn't random enough to hide values from an extension field (@extensionfields). See #link("https://eprint.iacr.org/2024/1037")[here] for more.] $Z$ of uniformly random masks to $G$, which gets a tail, encoded and committed like every other row.#s[Even though $Z$ is already random, it needs a tail. $G_r_"row"$'s tail is a weighted sum of the data rows' tails, so sending it unmasked would expose a combination of the very randomness hiding the opened columns. $Z$'s tail hides it.] Now, to open $tilde(g)(r) = v$:
+Before committing, we'll have the prover append an extra row#s[Technically a few rows, not one, because a single base field row isn't random enough to hide values from an extension field (@extensionfields). See #link("https://eprint.iacr.org/2024/1037")[Haböck and Al Kindi (2024)] for more.] $Z$ of uniformly random masks to $G$, which gets a tail, and is encoded and committed like every other row.#s[Even though $Z$ is already random, it needs a tail. $G_r_"row"$'s tail is a weighted sum of the data rows' tails, so sending it unmasked would expose a combination of the very randomness hiding the opened columns. $Z$'s tail hides it.] Now, to open $tilde(g)(r) = v$:
 
   1. The prover sends $overline(v) = v + h_1$ and $overline(z) = z + h_2$, where $z = tilde(Z)(r_"col")$.#s[As usual, $h_1, h_2$ are fresh pads.]
   2. The verifier sends a random $beta in FF$.
@@ -905,13 +904,9 @@ The idea is really simple: at any point where we'd normally wait for the verifie
   caption: [Fiat-Shamir replaces each random challenge with a hash of everything sent so far.],
 ) <fig-fiat-shamir>]
 
-*Why does this work?* Each challenge is a hash of the prover's earlier messages, so changing any of those messages changes the challenge too. And since a good hash function is unpredictable, the prover can't know what challenge it'll get until it has already settled on its messages, just like in the interactive version.#s[This is why it's critical that we hash _everything_ a challenge is meant to test. If some value the prover can choose isn't hashed, the challenge doesn't depend on it, so the prover can compute the challenge first and then pick that value to pass whatever check the challenge feeds into. Getting this wrong has broken real proof systems, see #link("https://eprint.iacr.org/2023/691")[Dao et al. (2023)].] There's just one big issue: _grinding_.
+*Why does this work?* Each challenge is a hash of the prover's earlier messages, so changing any of those messages changes the challenge too. And since a good hash function is unpredictable, the prover can't know what challenge it'll get until it has already settled on its messages, just like in the interactive version.#s[This is why it's critical that we hash _everything_ a challenge is meant to test. If some value the prover can choose isn't hashed, the challenge doesn't depend on it, so the prover can compute the challenge first and then pick that value to pass whatever check the challenge feeds into. Getting this wrong has broken real proof systems, see #link("https://eprint.iacr.org/2023/691")[Dao et al. (2023)].] 
 
-== Grinding & soundness
-
-Against a live verifier, a cheating prover only gets one shot per challenge. But against a hash, it can just keep tweaking its message over and over (_grinding_) offline until a challenge happens to land somewhere lucky.
-
-Specifically, if each attempt succeeds with probability $epsilon$, then $q$ attempts succeed with probability up to about $q dot epsilon$.#s[This assumes the hash behaves like a truly random function, a.k.a. the #link("https://en.wikipedia.org/wiki/Random_oracle")[_random oracle model_].]
+*There's just one big issue: _grinding_.* Against a live verifier, a cheating prover only gets one shot per challenge. But against a hash, it can just keep tweaking its message over and over offline until a challenge happens to land somewhere lucky. Specifically, if each attempt succeeds with probability $epsilon$, then $q$ attempts succeed with probability up to about $q dot epsilon$.#s[This assumes the hash behaves like a truly random function, a.k.a. the #link("https://en.wikipedia.org/wiki/Random_oracle")[_random oracle model_].]
 
 For a degree-$2$ round polynomial over the Goldilocks field, $epsilon approx 2^(-63)$, so an attacker who can afford $2^60$ hashes (the Bitcoin network does $approx 2^70$/s) can succeed at cheating with probability  $approx 1\/8$, yikes! This is one of the main reasons *why we draw challenges from an extension field* (@extensionfields), as e.g. over $FF_(p^2)$ the chance of success even after $2^60$ attempts is only $approx 2^(-67)$.
 
@@ -919,7 +914,7 @@ For a degree-$2$ round polynomial over the Goldilocks field, $epsilon approx 2^(
 
 = Putting it all together
 
-That's all the tools we need! It might seem limiting to have to express everything in terms of tables and matrices, but they're actually enough to prove arbitrary computation. This is because any program can be rewritten as an _arithmetic circuit_, a DAG of addition and multiplication gates, and circuits are easy to prove with our tools: each layer's wire values become a table and each gate becomes an elementwise polynomial relation (@elementwisepoly).#s[Circuits are usually expressed as an #link("https://www.rareskills.io/post/rank-1-constraint-system")[_Rank 1 Constraint System (R1CS)_], which is just three matrix products and one elementwise product, provable via the tools from @matmul and @elementwisepoly.] Some operations make for awkward (and thus expensive) circuits though, like comparisons or bit manipulation, and for those we reach for lookups instead (@nonpoly).
+That's all the tools we need! It might seem limiting to have to express everything in terms of tables and matrices, but they're actually enough to prove arbitrary computation. This is because any program can be rewritten as an _arithmetic circuit_, a DAG of addition and multiplication gates, and circuits are easy to prove with our tools: each layer's wire values become a table and each gate becomes an elementwise polynomial relation (@elementwisepoly).#s[Circuits are usually expressed as an #link("https://www.rareskills.io/post/rank-1-constraint-system")[_Rank-1 Constraint System (R1CS)_], which is just three matrix products and one elementwise product, provable via the tools from @matmul and @elementwisepoly.] Some operations make for awkward (and thus expensive) circuits though, like comparisons or bit manipulation, and for those we reach for lookups instead (@nonpoly).
 
 To recap how the pieces fit together into one proof:
 
@@ -980,11 +975,11 @@ This is a bigger deal than it might seem! Since the original table's row is neve
 
 == Refreshing commitments <manyopenings>
 
-Some tables are ephemeral, committed only for one proof and then never used again. Others might get committed once and then used over and over across many proofs. *The zero-knowledge commitments we've constructed can't hide a table forever though*, since the random tails we added in @zkcommitments only hide the table while at most $tau$ distinct columns have been opened, and every opening reveals some new random columns. Once a commitment hits that limit, it's no longer safe to open, and we need to make a new one to "refresh" it.#s[Recursive openings (as described above in @recursiveopenings) make long tails cheap, so $tau$ can be huge, and once a table's first opening has shown it's close to RS codewords, later openings only need a few columns each, so we won't be revealing many columns per opening. But on a long enough time scale, we'll hit the limit _eventually_.]
+Some tables are ephemeral, committed only for one proof and then never used again. Others might get committed once and then used over and over across many proofs. *The zero-knowledge commitments we've constructed can't hide a table forever though*, since the random tails we added in @zkcommitments only hide the table while at most $tau$ distinct columns have been opened, and every opening reveals some new random columns. Once a commitment hits that limit, it's no longer safe to open, and we need to make a new one to "refresh" it.#s[Recursive openings (as described above in @recursiveopenings) make long tails cheap, so $tau$ can be huge, and once a table's first opening has shown it's close to RS codewords, later openings only need a few columns each. But on a long enough time scale, we'll hit the limit _eventually_.]
 
 *But how can a verifier trust that our new commitment holds the same underlying table?* With a _link_ proof! Say the old commitment is of $g$ and the new one is of $g'$, with fresh tails. To prove $g = g'$, the verifier picks a random point $r$, opens both commitments at it (@openings), and checks that the two opened rows fold to the same value.#s[This is just the identity test (@identitytest) on $g$ and $g'$. Only the first $W$ cells of each row get folded, since their tails are different on purpose. In practice these are ZK openings (@maskedopenings), so the comparison becomes a claim about the pads (@padclaims).] 
 
-#note[The old commitment is already known to be close to RS codewords, so just a few of its columns are enough, while this is the new one's first opening, so the verifier opens lots of its columns to ensure proximity.]
+#note[The old commitment is already known to be close to RS codewords, so just a few of its columns are enough. The new one hasn't been opened before, so the verifier opens lots of its columns to show it's close to RS codewords too.]
 
 To trust a new commitment, the verifier has to check every link between it and the original. So rather than linking each new commitment to the one before it, which makes the path longer with each additional commitment, the *prover links all new commitments straight to the first one* (the _root_ commitment), which gets one big opening up front to show it's close to RS codewords, and serves as the table's single, permanent source of truth.
 
