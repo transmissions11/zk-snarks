@@ -1,0 +1,427 @@
+/* Styles for the web version of the document (HTML export), matching template.typ's PDF theme.
+   Inlined into the page by `page` in web.typ. Fonts live in site/fonts/; the page preloads
+   them, and `font-display: block` waits briefly for them rather than flashing a fallback font. */
+
+@font-face { font-family: "Libertinus Sans"; src: url("fonts/LibertinusSans-Regular.woff2") format("woff2"); font-weight: normal; font-style: normal; font-display: block; }
+@font-face { font-family: "Libertinus Sans"; src: url("fonts/LibertinusSans-Bold.woff2") format("woff2"); font-weight: bold; font-style: normal; font-display: block; }
+@font-face { font-family: "Libertinus Sans"; src: url("fonts/LibertinusSans-Italic.woff2") format("woff2"); font-weight: normal; font-style: italic; font-display: block; }
+
+:root {
+  /* template.typ `colors` */
+  --cherry-red: #ba0017;
+  --powder-pink: #fef2f4;
+  --salmon-pink: #ee6983;
+  --cream: #fff4e0;
+  --peach: #f4b183;
+  --pale-blue: #f7fbfc;
+  --light-blue: #769fcd;
+  --pale-sage: #f3f7ed;
+  --sage: #98b475;
+  --link-blue: #0074d9; /* Typst's `blue`, used for external links */
+
+  --text: #000;
+  --bg: #fff;
+  --rule: #e6e6e6;
+
+  /* Layout: text column, gap, sidenote column. (A bit wider than the PDF's proportions, which
+     would be a 33.5em text column, 1.5em gap and 11.4em note column.) */
+  --main: 680px;
+  --gap: 30px;
+  --side: 250px;
+  --toc: 260px;
+  --topbar: 46px;
+}
+
+* { box-sizing: border-box; }
+html { scroll-padding-top: calc(var(--topbar) + 16px); -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Libertinus Sans", "Gill Sans", "Segoe UI", sans-serif;
+  font-size: 18.5px;
+  line-height: 1.31; /* Typst's 0.65em leading between lines of Libertinus Sans. */
+  /* Browsers on macOS thicken text slightly; PDF viewers don't. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-kerning: normal;
+  font-variant-ligatures: common-ligatures;
+}
+
+/* ---------------------------------------------------------------- Top bar (the PDF's page header) */
+
+/* Fixed rather than sticky, so it stays put (like the contents sidebar) when macOS rubber-bands
+   the page past the top. */
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  height: var(--topbar);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--rule);
+  font-weight: bold;
+  font-variant-caps: small-caps;
+}
+.topbar .topbar-title { color: inherit; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar-author { margin-left: auto; white-space: nowrap; }
+/* Reading progress, in place of the PDF header's page dots. */
+/* Hidden while the title block is on screen (the page starts .at-top; web.js keeps it updated),
+   except for the contents button, and shown while the contents drawer is open. */
+.topbar { transition: background-color 0.2s, border-color 0.2s; }
+.topbar-title, .topbar-author, .topbar::after { transition: opacity 0.2s; }
+body.at-top:not(.toc-open) .topbar {
+  background-color: transparent;
+  border-bottom-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  pointer-events: none;
+}
+body.at-top:not(.toc-open) .topbar-title, body.at-top:not(.toc-open) .topbar-author, body.at-top:not(.toc-open) .topbar::after { opacity: 0; }
+body.at-top:not(.toc-open) .toc-toggle { pointer-events: auto; }
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  height: 2px;
+  width: calc(var(--progress, 0) * 100%);
+  background: var(--cherry-red);
+}
+.toc-toggle {
+  display: none;
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
+  padding: 6px 8px;
+  margin-left: -8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------- Page */
+
+/* Like LessWrong: the text column is centred in the window and the notes hang off its right,
+   unless that would push the notes off-screen (or, with the sidebar, the text under it). */
+.page {
+  --min-left: 20px;
+  padding: 0 20px 64px clamp(
+    var(--min-left),
+    (100vw - var(--main)) / 2,
+    100vw - var(--main) - var(--gap) - var(--side) - 24px
+  );
+}
+article, .titleblock, .pagefoot { width: var(--main); max-width: 100%; }
+
+.titleblock { text-align: center; padding: 56px 0 20px; }
+.titleblock p { text-align: center; }
+.titleblock h1 { font-size: 2.27em; line-height: 1.15; margin: 0 0 0.12em; }
+.byline { font-size: 1.36em; line-height: 1.3; margin: 0; }
+.date { color: var(--cherry-red); }
+
+.pagefoot {
+  margin-top: 64px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+  font-weight: bold;
+  font-variant-caps: small-caps;
+}
+
+/* Paragraphs 1.2em apart, as in Typst. Line breaks balanced over the paragraph, closer to Typst's
+   than the browser's default line-by-line filling. */
+p { margin: 0 0 0.55em; text-align: justify; hyphens: auto; -webkit-hyphens: auto; text-wrap: pretty; }
+li, .sidenote, figcaption { text-wrap: pretty; }
+/* Lists as in Typst: the marker at the text's left edge, the item 0.5em after it, and items
+   spaced like lines. Markers are drawn here (browsers place their own a bit further out). */
+article ol, article ul { list-style: none; padding-left: 0; margin: 0 0 0.55em; }
+article ol > li, article ul > li { position: relative; }
+article ul > li { padding-left: 0.85em; }
+article ol > li { padding-left: 1.19em; }
+article ul > li::before { content: "•"; position: absolute; left: 0; }
+article ol > li::before { content: counter(list-item) "."; position: absolute; left: 0; }
+article li > p:last-child { margin-bottom: 0; }
+hr { border: 0; border-top: 1px solid var(--text); margin: 1em 0; }
+img { max-width: 100%; height: auto; }
+
+a { text-decoration: none; color: var(--link-blue); }
+a[href^="#"] { color: var(--cherry-red); }
+a:hover { text-decoration: underline; }
+
+/* Bold italics: the PDF thickens italics inside bold rather than using a bold italic face. */
+strong em { font-weight: normal; -webkit-text-stroke: 0.025em currentColor; }
+
+/* ---------------------------------------------------------------- Headings */
+
+h2, h3, h4, h5 { font-weight: bold; line-height: 1.2; margin: 1.6em 0 0.55em; text-align: left; }
+h2 { font-size: 1.68em; }
+h3 { font-size: 1.45em; }
+h4 { font-size: 1.23em; }
+h5 { font-size: 1em; }
+.secnum { color: var(--cherry-red); margin-right: 0.25em; }
+
+/* ---------------------------------------------------------------- Math */
+
+/* Equations are SVGs drawn by Typst (see web.typ), sized in ems so they scale with the text.
+   Inline ones sit on the baseline with their descenders hanging below. */
+svg.glyphs { position: absolute; width: 0; height: 0; overflow: hidden; } /* Shared glyphs (build_site.py). */
+/* Inline equation pictures reach 1em below their baseline (see web.typ); line that up with the
+   text's baseline, without the extra depth making lines taller. */
+.im > svg { margin-bottom: -1em; }
+/* Maths hanging below the usual text depth by --d (see web.typ) gets that much more room under
+   its line, as in Typst, from an invisible spacer reaching that far down. --line-depth is how far
+   a line of text already reaches below its baseline. */
+.im { white-space: nowrap; }
+.mj { font-size: 0; } /* A space with no width of its own, between maths pieces (see web.typ). */
+.im[style]::after {
+  content: "";
+  display: inline-block;
+  width: 0;
+  height: calc(var(--d) + var(--line-depth));
+  vertical-align: calc(-1 * (var(--d) + var(--line-depth)));
+}
+body { --line-depth: 0.337em; }
+.sidenote, figcaption { --line-depth: 0.266em; }
+.nobr { white-space: nowrap; } /* An inline equation and the punctuation touching it (build_site.py). */
+.eqn { position: relative; margin: 0.75em 0; }
+.eq-scroll { text-align: center; padding: 2px 0; }
+.eq-scroll > svg { display: inline-block !important; vertical-align: middle; }
+.eqnum { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+.qed { float: right; margin-left: 1em; }
+
+/* ---------------------------------------------------------------- Theorem boxes (ctheorems) */
+
+/* Spacing measured off the PDF (template.typ's thmbox_args) on boxes of ordinary text, in ems of
+   the body text: border to title baseline 1.40, title to body baseline 1.79, last baseline to
+   border 0.73, sides 0.73. (Typst spreads lines with tall maths a little further apart.) */
+.thm {
+  margin: 0.87em 0;
+  padding: 0.29em 0.73em 0.34em;
+  border: 1px solid;
+  border-radius: 0.3em;
+}
+.thm + .thm { margin-top: 1.2em; } /* Typst's block spacing between stacked boxes. */
+.thm-head { display: flex; align-items: baseline; gap: 1em; margin-bottom: 0.4em; font-size: 1.09em; }
+.thm-name { font-weight: bold; }
+.thm-kind { margin-left: auto; font-variant-caps: small-caps; white-space: nowrap; }
+.thm-body > :first-child { margin-top: 0; }
+.thm-body > :last-child { margin-bottom: 0; }
+.thm-body > p:last-child { margin-bottom: 0; }
+.thm-theorem { background: var(--powder-pink); border-color: var(--salmon-pink); }
+.thm-lemma { background: var(--cream); border-color: var(--peach); }
+.thm-corollary, .thm-example { background: var(--pale-blue); border-color: var(--light-blue); }
+.thm-definition { background: var(--pale-sage); border-color: var(--sage); }
+
+.thm-proof { margin: 0.8em 0 0; padding: 0; border: 0; background: none; text-align: justify; hyphens: auto; }
+.thm-proof > .thm-kind, .thm-proof > p:first-child > .thm-kind { margin: 0; font-weight: bold; font-size: 1em; }
+.thm-proof p:last-child { margin-bottom: 0; }
+
+/* ---------------------------------------------------------------- Sidenotes & margin column */
+
+.sn-ref, .sn-num { color: var(--cherry-red); font-size: 0.68em; line-height: 0; }
+.sn-ref { padding-left: 0.05em; }
+.sn-num { margin-right: 0.15em; }
+.sn-ref a { color: inherit; }
+/* Hovering a note or its number tints the note (a square patch, a few px past the text) and
+   underlines the number, to show which goes with which. Numbers feel like links. */
+.sn-wrap > .sn-ref { cursor: pointer; }
+.sidenote:not(.marginnote) { transition: background-color 0.15s, box-shadow 0.15s, opacity 0.15s; }
+@media (hover: hover) {
+  .sn-ref:hover, .sn-wrap:hover > .sn-ref { text-decoration: underline; text-underline-offset: 0.15em; }
+  .sn-wrap:hover > .sidenote:not(.marginnote) {
+    background-color: var(--powder-pink);
+    box-shadow: 0 0 0 5px var(--powder-pink);
+  }
+}
+
+/* Margin items (sidenotes and figure captions) are taken out of the flow and put in the margin
+   column. Each starts level with the line it belongs to; web.js then lays the column out like
+   marginalia does: stacked without overlaps, wide figures' captions just above them, and notes
+   shifted up out of a wide figure's way. */
+article { position: relative; }
+.sidenote, figcaption {
+  position: absolute;
+  left: calc(100% + var(--gap));
+  width: var(--side);
+  margin: 0;
+}
+.sidenote {
+  font-size: 15.1px; /* 9pt next to 11pt text. */
+  line-height: 1.16; /* marginalia's 0.5em leading. */
+  /* Left-aligned, unlike the PDF: in a column this narrow, justifying leaves huge gaps whenever
+     a long word won't fit. */
+  text-align: left;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  font-weight: normal;
+  font-style: normal;
+}
+/* Hidden until web.js has laid the column out, so notes don't visibly jump into place. */
+figcaption { transition: opacity 0.15s; }
+@media not (max-width: 1000px) {
+  body.margin-pending :is(.sidenote, figcaption) { opacity: 0; transition: none; }
+}
+.sidenote .sn-br { display: block; height: 0.7em; }
+/* Lists and display equations inside notes are spans (see web.typ), laid out as blocks. */
+.sn-p { display: block; }
+.sn-list { display: block; margin: 0.3em 0; }
+.sn-li { display: block; position: relative; padding-left: 0.85em; } /* As in the text, above. */
+.sn-enum > .sn-li { padding-left: 1.19em; }
+.sn-marker { position: absolute; left: 0; }
+span.eqn, span.eq-scroll, span.eqnum { display: block; }
+.sidenote .eqn { margin: 0.4em 0; }
+.sidenote img { display: block; }
+
+/* Figures: captions go in the margin, top-aligned with the figure. */
+figure { margin: 1.1em 0; }
+figure img { display: block; width: 100%; }
+figcaption {
+  font-size: 15.1px; /* 9pt next to 11pt text. */
+  line-height: 1.16; /* marginalia's 0.5em leading. */
+  text-align: left; /* As sidenotes, above. */
+  hyphens: auto;
+}
+/* Wide blocks span the text and margin columns; their captions sit in the margin column above. */
+.wide { width: calc(100% + var(--gap) + var(--side)); margin: 1.1em 0; }
+
+/* The appendix's page background, as a full-width band. */
+.page-fill {
+  background: var(--fill);
+  box-shadow: 0 0 0 100vmax var(--fill);
+  clip-path: inset(0 -100vmax);
+  padding: 1px 0 2em;
+  margin-top: 3em;
+}
+
+/* ---------------------------------------------------------------- Reference previews */
+
+/* Hovering a link to a theorem, equation or figure shows a copy of it here (web.js). */
+.ref-popup {
+  display: none;
+  position: fixed;
+  z-index: 30;
+  width: min(600px, calc(100vw - 24px));
+  max-height: 60vh;
+  overflow: auto;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 0.3em; /* As theorem boxes. */
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  font-size: 0.9em;
+}
+.ref-popup.open { display: block; }
+.ref-popup.is-box { padding: 0; border: 0; background: none; }
+.ref-popup.is-eqn, .ref-popup.is-heading { width: max-content; max-width: min(600px, calc(100vw - 24px)); padding: 6px 12px; }
+.ref-popup.is-heading > * { font-size: 1.15em; line-height: 1.25; }
+.ref-popup .thm-head:last-child { margin-bottom: 0; } /* No body (see web.js). */
+.ref-popup > * { margin: 0; }
+.ref-popup figcaption { position: static; width: auto; margin: 0 0 0.5em; }
+
+/* ---------------------------------------------------------------- Contents */
+
+.toc { font-size: 15px; line-height: 1.3; z-index: 15; }
+.toc-list { list-style: none; margin: 0; padding: 0; }
+.toc-list li { margin: 0; }
+/* The highlight sticks out 8px on both sides, so the text itself lines up with the title. Wrapped
+   lines hang under the title text, not under the section number. */
+.toc-list a {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 0.3em;
+  margin: 0 -8px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  color: var(--cherry-red);
+}
+.toc-list a:hover { text-decoration: none; background: var(--powder-pink); }
+.toc-list .secnum { margin: 0; }
+.toc-list .toc-l1:not(:first-child) { margin-top: 0.45em; }
+.toc-l1 > a { font-weight: bold; }
+.toc-list .toc-l2 { margin-left: 1em; }
+.toc-list a.active { background: var(--powder-pink); }
+
+/* Wide screens: contents in a fixed left sidebar. */
+@media (min-width: 1330px) {
+  .toc {
+    position: fixed;
+    top: var(--topbar);
+    bottom: 0;
+    left: 0;
+    width: var(--toc);
+    overflow-y: auto;
+    padding: 16px 24px; /* Highlights stick out 8px, so their edges sit 16px from every side. */
+    border-right: 1px solid var(--rule);
+    background: var(--bg);
+    transition: top 0.2s;
+  }
+  body.at-top .toc { top: 0; } /* Takes the hidden top bar's place. */
+  .page { --min-left: calc(var(--toc) + 40px); }
+  .page-fill { clip-path: inset(0 -100vmax 0 calc(-1 * (100vw))); }
+}
+
+/* Narrower: contents in a drawer opened from the top bar. */
+@media (max-width: 1329.98px) {
+  .toc-toggle { display: block; }
+  .toc {
+    position: fixed;
+    top: var(--topbar);
+    left: 0;
+    bottom: 0;
+    z-index: 15;
+    width: min(320px, 86vw);
+    overflow-y: auto;
+    padding: 16px 24px; /* Highlights stick out 8px, so their edges sit 16px from every side. */
+    background: var(--bg);
+    border-right: 1px solid var(--rule);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.08);
+    transform: translateX(-105%);
+    transition: transform 0.2s ease;
+  }
+  body.toc-open .toc { transform: none; }
+}
+
+/* Narrow: no margin column. Sidenotes open inline when their number is tapped. */
+@media (max-width: 1000px) {
+  body { font-size: 17.5px; }
+  .page { width: auto; padding: 0 16px 48px; }
+  article, .titleblock, .pagefoot { width: auto; }
+  .titleblock { padding-top: 56px; } /* Clear of the contents button. */
+  .wide { width: 100%; }
+  /* Long inline formulas can't wrap; let their paragraph scroll rather than widen the page. */
+  article p, article li { overflow-x: auto; overflow-y: hidden; padding-block: 2px; }
+  .sn-ref { padding: 0 0.15em; }
+  .sidenote {
+    position: static;
+    display: none;
+    float: none;
+    width: auto;
+    margin: 0.5em 0 0.8em;
+    padding: 0.45em 0.7em;
+    background: #fafafa;
+    border-left: 2px solid var(--salmon-pink);
+    font-size: 15px;
+  }
+  .sidenote.open, .sidenote.marginnote { display: block; }
+  .sn-end { display: none; } /* Notes are inline here (see web.typ). */
+  .sidenote.marginnote { background: none; border: 0; padding: 0; }
+  .sidenote.marginnote img { margin: 0 auto; max-width: 300px; width: 100%; }
+  figcaption { position: static; width: auto; margin: 0 0 0.6em; font-size: 15px; }
+  .eqn { display: flex; align-items: center; gap: 0.6em; }
+  .eqn > .eq-scroll { flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; } /* Wide ones scroll. */
+  .eqnum { position: static; transform: none; flex: none; }
+  .thm-head { flex-wrap: wrap; row-gap: 0; }
+}
+
+@media print {
+  .topbar, .toc { display: none; }
+}

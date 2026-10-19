@@ -1,6 +1,7 @@
 #import "@preview/ctheorems:1.1.3": *
 #import "@preview/quick-maths:0.2.1": shorthands
 #import "@preview/marginalia:0.3.1" as marginalia
+#import "web/web.typ" // The web version's layout, used wherever `target() == "html"` below.
 
 // Macros for common snippets:
 #let def = $:=$
@@ -9,9 +10,9 @@
 #let bij = $<->$
 #let inj = $arrow.r.hook$
 #let surj = $arrow.r.twohead$
-#let QED = [#h(1fr)$qed$]
+#let QED = context if target() == "html" { web.qed() } else [#h(1fr)$qed$]
 #let section = sym.section
-#let divider = [#line(length: 100%)]
+#let divider = context if target() == "html" { web.divider() } else [#line(length: 100%)]
 #let note(body) = [*#smallcaps("Note"):*~#body]
 #let case(title, body) = [+ #block[*#title*#parbreak()#body]]
 #let todo(body) = [#block(fill: orange, inset: 4pt, text(size: 2em)[*TODO:* #body])]
@@ -21,7 +22,7 @@
 #let cmath(color, body) = text(fill: color)[$#body$]
 #let mics = $upright(mu s)$
 // Sidenotes share one sequence with footnotes so numbers never collide.
-#let sidenote = marginalia.note.with(
+#let pdf_sidenote = marginalia.note.with(
   counter: counter(footnote),
   // block-style: (width: 100%, fill: luma(99%), inset: 5pt, radius: 3pt),
   numbering: (..n) => super(numbering("1", ..n)),
@@ -29,13 +30,25 @@
   // Force size/weight/style so notes don't pick up formatting from where their marker sits.
   text-style: (size: 9pt, weight: "regular", style: "normal"),
 )
+// The leading metadata keeps a labelled sidenote referenceable (marginalia looks for it).
+#let sidenote(..args) = [#metadata("_marginalia_note")#context if target() == "html" {
+  web.sidenote(args.named().at("counter", default: auto) != none, args.pos().last())
+} else { pdf_sidenote(..args) }]
 #let sn = sidenote
 #let s = sidenote
 #let fn = footnote
 // Block spanning the text and sidenote columns; notes shift to avoid it. Normal width without sidenotes.
-#let wideblock = marginalia.wideblock
+#let wideblock(..args) = context if target() == "html" { web.wideblock(args.pos().last()) } else {
+  marginalia.wideblock(..args)
+}
 // Use as `#show: page_per_h1` to start every following level-1 heading on a fresh page.
 #let page_per_h1(rest) = { show heading.where(level: 1): it => pagebreak(weak: true) + it; rest }
+
+// Use as `#show: page_fill.with(color)` to give the rest of the document a page background.
+#let page_fill(fill, rest) = context if target() == "html" { web.page_fill(fill, rest) } else {
+  set page(fill: fill)
+  rest
+}
 
 // How many heading levels prefix theorem and equation numbers, e.g. 2 gives Theorem 1.4.3.
 #let numbering_depth = 2
@@ -71,6 +84,48 @@
   inset: (top: 0.7em, rest: 8pt),
   base_level: numbering_depth, // Truncate the heading prefix of theorem numbers.
 )
+
+// ctheorems' `thmbox`, plus a web version of the box (`web_bodyfmt` formats the body there). The
+// PDF branch is ctheorems' own box format, unchanged.
+#let thmbox(
+  identifier,
+  head,
+  ..blockargs,
+  supplement: auto,
+  padding: (top: 0.5em, bottom: 0.5em),
+  namefmt: x => [(#x)],
+  titlefmt: strong,
+  bodyfmt: x => x,
+  separator: [#h(0.1em):#h(0.2em)],
+  base: "heading",
+  base_level: none,
+  web_bodyfmt: x => x,
+) = {
+  if supplement == auto { supplement = head }
+  let pdf_fmt(name, number, body, title: auto, ..blockargs_individual) = {
+    if not name == none { name = [ #namefmt(name)] } else { name = [] }
+    if title == auto { title = head }
+    if not number == none { title += " " + number }
+    title = titlefmt(title)
+    body = bodyfmt(body)
+    pad(
+      ..padding,
+      block(
+        width: 100%,
+        inset: 1.2em,
+        radius: 0.3em,
+        breakable: false,
+        ..blockargs.named(),
+        ..blockargs_individual.named(),
+        [#title#name#separator#body]
+      )
+    )
+  }
+  let fmt(..args) = context if target() == "html" { web.thm(identifier, head, web_bodyfmt, ..args) } else {
+    pdf_fmt(..args)
+  }
+  thmenv(identifier, base, base_level, fmt).with(supplement: supplement)
+}
 
 // Boxes from ctheorems:
 #let theorem = thmbox(
@@ -113,12 +168,18 @@
   ..thmbox_args,
 )
 
-#let proof = thmproof(
+// Equivalent to ctheorems' `thmproof` (via `thmplain`), built on the `thmbox` above.
+#let proof = thmbox(
   "proof",
   "Proof",
+  padding: (top: 0em, bottom: 0em),
+  breakable: true,
   inset: 0pt,
+  namefmt: emph,
   titlefmt: title => [*#smallcaps(title)*],
-)
+  bodyfmt: proof-bodyfmt,
+  web_bodyfmt: web.proof_body,
+).with(numbering: none)
 
 // Theme loader:
 #let themed_document(
@@ -174,6 +235,11 @@
       let number = thmcounters.at(thms.first().location()).latest
 
       link(it.target, [#supplement~#numbering(it.element.numbering, ..number)])
+    } else if (
+      it.element.func() == [].func() and it.element.children.len() > 1
+        and it.element.children.first() == metadata("_marginalia_note")
+    ) {
+      context if target() == "html" { web.sidenote_ref(it.element) } else { it }
     } else if it.element.func() == math.equation {
       // Read both counters at the equation itself, not at the reference.
       let loc = it.element.location()
@@ -190,15 +256,20 @@
     if it.block and it.numbering != none and not it.has("label") [
       #counter(math.equation).update(v => v - 1)
       #math.equation(it.body, block: true, numbering: none)
-    ] else { it } // Only show equation numbers when they are labeled and have numbering.
+    ] else if target() == "html" {
+      if it.block { web.display_math(it) } else { web.inline_math(it) }
+    } else { it } // Only show equation numbers when they are labeled and have numbering.
   }
 
   // Seperate and color heading numbers differently from heading text.
   set heading(numbering: heading_numberings.first())
-  show heading: it => {
+  let heading_number(level) = counter(heading).display(heading_numberings.at(
+    calc.min(level, heading_numberings.len()) - 1,
+  ))
+  show heading: it => context {
     // Restart equation numbering only at headings that appear in the number prefix.
     if it.level <= numbering_depth { counter(math.equation).update(0) }
-    block([
+    if target() == "html" { web.heading(it, heading_number(it.level)) } else { block([
       #set text(font: heading_font, size: 21pt - (it.level * 2.5pt))
       #if (it.numbering != none) [
         #text(colors.cherry_red)[#counter(heading).display(heading_numberings.at(
@@ -208,116 +279,122 @@
       ]
       #it.body
       #v(0.4em) // Space below headings.
-    ])
+    ]) }
   }
 
-  // Page margins, widened on the right if sidenotes are enabled.
-  let margin = margin_presets.at(if margins == none { "default" } else { margins })
-  if sidenotes { margin.right += sidenote_width }
-  let full_width = 100% + (margin.right - margin.left) // Text width plus the sidenote area.
+  // On the web the document is a site rather than pages; everything below this is the PDF layout.
+  context if target() == "html" {
+    set figure.caption(position: top) if sidenotes // web.js puts it in the margin, as in the PDF.
+    web.page(title: title, author: author, date: date, toc: toc, heading_numberings: heading_numberings, body)
+  } else {
+    // Page margins, widened on the right if sidenotes are enabled.
+    let margin = margin_presets.at(if margins == none { "default" } else { margins })
+    if sidenotes { margin.right += sidenote_width }
+    let full_width = 100% + (margin.right - margin.left) // Text width plus the sidenote area.
 
-  // Sidenote column in the right margin, with outer padding mirroring the left page margin.
-  // Marginalia sets the page margins from this, so it must agree with `margin` above.
-  let note_sep = 1.5em // Gap between the text and the sidenote column.
-  show: marginalia.setup.with(
-    inner: (far: margin.left, width: 0pt, sep: 0pt),
-    outer: if sidenotes {
-      (far: margin.left, width: margin.right - margin.left - note_sep, sep: note_sep)
-    } else { (far: margin.right, width: 0pt, sep: 0pt) },
-    top: margin.top,
-    bottom: margin.bottom,
-  )
-
-  // Figure captions go in the sidenote column, top-aligned with the figure (from marginalia's README).
-  set figure(gap: 0pt) if sidenotes // Caption is in the margin, so no gap below the figure.
-  set figure.caption(position: top) if sidenotes
-  show figure.caption.where(position: top): it => if sidenotes {
-    sidenote(
-      alignment: "top", counter: none, shift: "avoid", keep-order: true,
-      dy: -0.01pt, // So the caption is placed above wide figures rather than pushed below them.
-      it,
+    // Sidenote column in the right margin, with outer padding mirroring the left page margin.
+    // Marginalia sets the page margins from this, so it must agree with `margin` above.
+    let note_sep = 1.5em // Gap between the text and the sidenote column.
+    show: marginalia.setup.with(
+      inner: (far: margin.left, width: 0pt, sep: 0pt),
+      outer: if sidenotes {
+        (far: margin.left, width: margin.right - margin.left - note_sep, sep: note_sep)
+      } else { (far: margin.right, width: 0pt, sep: 0pt) },
+      top: margin.top,
+      bottom: margin.bottom,
     )
-  } else { it }
 
-  set page(
-    // Pretty header on each non-cover page with title & dots for page num.
-    header: context {
-      let page_num = here().page()
-      if page_num > 1 { block(width: full_width)[
-        *#smallcaps[#title]*
-        #h(1fr)
-        #box(
-          inset: (bottom: 1pt),
-          (
-            calc.min(page_num, 50) // Too many dots is bad for long docs.
-              * (
-                box(
-                  circle(
-                    radius: 2pt,
-                    fill: black,
+    // Figure captions go in the sidenote column, top-aligned with the figure (from marginalia's README).
+    set figure(gap: 0pt) if sidenotes // Caption is in the margin, so no gap below the figure.
+    set figure.caption(position: top) if sidenotes
+    show figure.caption.where(position: top): it => if sidenotes {
+      sidenote(
+        alignment: "top", counter: none, shift: "avoid", keep-order: true,
+        dy: -0.01pt, // So the caption is placed above wide figures rather than pushed below them.
+        it,
+      )
+    } else { it }
+
+    set page(
+      // Pretty header on each non-cover page with title & dots for page num.
+      header: context {
+        let page_num = here().page()
+        if page_num > 1 { block(width: full_width)[
+          *#smallcaps[#title]*
+          #h(1fr)
+          #box(
+            inset: (bottom: 1pt),
+            (
+              calc.min(page_num, 50) // Too many dots is bad for long docs.
+                * (
+                  box(
+                    circle(
+                      radius: 2pt,
+                      fill: black,
+                    ),
                   ),
-                ),
-              )
-          ).join(h(2pt)),
-        )
-      ] }
-    },
-    // Pretty footer with author & page num.
-    footer: context {
-      let page_counter = counter(page)
-      if (page_counter.final().at(0) == 1) { return none }
-      block(width: full_width)[
-        #text(weight: "bold", smallcaps[#if here().page() > 1 [#author] else [#sym.arrow.b]])
-        #h(1fr)
-        #page_counter.display("1 of 1", both: true)
+                )
+            ).join(h(2pt)),
+          )
+        ] }
+      },
+      // Pretty footer with author & page num.
+      footer: context {
+        let page_counter = counter(page)
+        if (page_counter.final().at(0) == 1) { return none }
+        block(width: full_width)[
+          #text(weight: "bold", smallcaps[#if here().page() > 1 [#author] else [#sym.arrow.b]])
+          #h(1fr)
+          #page_counter.display("1 of 1", both: true)
+        ]
+      },
+    )
+
+    // Title, author, date (centered on the page even if the margins are asymmetric).
+    block(width: full_width, align(title_align)[
+      #set text(font: heading_font)
+      #block(spacing: 1.3em)[#text(25pt, weight: "bold")[#title]]
+      #text(15pt)[
+        #if author == none [
+          #text(colors.cherry_red)[#date]
+        ] else [
+          #author (#text(colors.cherry_red)[#date])
+        ]
       ]
-    },
-  )
+    ])
 
-  // Title, author, date (centered on the page even if the margins are asymmetric).
-  block(width: full_width, align(title_align)[
-    #set text(font: heading_font)
-    #block(spacing: 1.3em)[#text(25pt, weight: "bold")[#title]]
-    #text(15pt)[
-      #if author == none [
-        #text(colors.cherry_red)[#date]
-      ] else [
-        #author (#text(colors.cherry_red)[#date])
-      ]
-    ]
-  ])
+    v(1em) // Some vertical space.
 
-  v(1em) // Some vertical space.
+    // Pretty table of contents if enabled.
+    if toc {
+      let contents = {
+        show outline: it => {
+          show heading: it => {
+            set text(font: heading_font)
+            set par(first-line-indent: 0em)
+            it.body
+            v(0.75em)
+          }
+          show outline.entry.where(level: 1): it => {
+            text(colors.cherry_red)[#strong[#it]]
+          }
+          show outline.entry: it => {
+            v(0.1em)
+            text(font: heading_font, colors.cherry_red)[#it]
+          }
+          it
+        }
 
-  // Pretty table of contents if enabled.
-  if toc {
-    let contents = {
-      show outline: it => {
-        show heading: it => {
-          set text(font: heading_font)
-          set par(first-line-indent: 0em)
-          it.body
-          v(0.75em)
-        }
-        show outline.entry.where(level: 1): it => {
-          text(colors.cherry_red)[#strong[#it]]
-        }
-        show outline.entry: it => {
-          v(0.1em)
-          text(font: heading_font, colors.cherry_red)[#it]
-        }
-        it
+        outline(indent: if sidenotes { 0.6em } else { auto }, depth: 2) // Narrow notes can't afford auto indents.
       }
 
-      outline(indent: if sidenotes { 0.6em } else { auto }, depth: 2) // Narrow notes can't afford auto indents.
+      if sidenotes {
+        place(sidenote(counter: none, alignment: "top", box(width: 100%, align(left, contents))))
+      } else { contents }
     }
 
-    if sidenotes {
-      place(sidenote(counter: none, alignment: "top", box(width: 100%, align(left, contents))))
-    } else { contents }
+    v(1em) // Some more vertical space.
+
+    body
   }
-
-  v(1em) // Some more vertical space.
-
-  body
 }

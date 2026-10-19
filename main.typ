@@ -180,7 +180,7 @@ For any table $g : {0,1}^ell -> FF$ and any $r in FF^ell$, the value $tilde(g)(r
 ]<evalweightedsum>
 
 #figure(
-  image("eq_tree.svg", width: 100%),
+  image("figures/eq_tree.svg", width: 100%),
   caption: [Folding $c = [1, 5, 3, 9]$ by $r = (2, 3)$, and how $"eq"_r$ relates.],
 )<fig-eq-tree>
 
@@ -330,7 +330,7 @@ What we've built is a _reduction_: if the claim about $tilde(g)(r)$ is false, th
 So we can apply this _as many times as we want_, working backwards until every claim lands on a committed or public table. This means the verifier can check an entire chain of operations *without ever seeing the intermediate tables*, and the prover only needs to commit and open the ones that can't be reduced further.
 
 #wideblock[#figure(
-  image("claim_chain.svg", width: 100%),
+  image("figures/claim_chain.svg", width: 100%),
   caption: [Proving $y = (x dot W_1) dot W_2$ with sum-check. Each sum-check turns a claim about one table into claims about its inputs, until every claim becomes about a committed/public table. This is often called a _#link("https://dl.acm.org/doi/10.1145/2699436")[GKR]-style_ protocol.],
 ) <fig-claim-chain>]
 
@@ -428,7 +428,7 @@ Whew okay, that was a lot of steps. *To summarize:*
 
 
 #wideblock[#figure(
-  image("logup.svg", width: 100%),
+  image("figures/logup.svg", width: 100%),
   caption: [_LogUp_ on $f = [3, 5, 3, 7]$ and $T = [2, 3, 5, 7]$.],
 ) <fig-logup>]
 
@@ -443,7 +443,7 @@ Now say we want to prove that some table $h$ of size $2^ell$ is just a version o
 
 $ h(x) = phi(g(x)) "for all" x in {0, 1}^ell $<tuplesclaim>
 
-Assume the cells of $g$ only take values in some small set $D$, for example all 16-bit integers. #sidenote(counter:none)[#image("relu_pairs.svg")] We can make a table that matches inputs/outputs of $phi$, and look up _pairs_ in this table to prove @tuplesclaim.
+Assume the cells of $g$ only take values in some small set $D$, for example all 16-bit integers. #sidenote(counter:none)[#image("figures/relu_pairs.svg")] We can make a table that matches inputs/outputs of $phi$, and look up _pairs_ in this table to prove @tuplesclaim.
 
 Let $T$ have $N = abs(D)$ rows and two columns, every possible input $T_"in" (y) in D$ alongside $T_"out" (y) := phi(T_"in" (y))$. Our claim is thus that every pair $(g(x), h(x))$ is a row of $T$. Each input appears in exactly one row, so this forces $h(x) = phi(g(x))$.
 
@@ -456,7 +456,7 @@ Unlike $u$ and $v$ in LogUp, *these two tables are never committed or sent*. The
 We then prove every cell of $f$ appears in $t$. A pair that isn't a row of $T$ only survives squashing if $gamma$ is unlucky. For each row $y$, the pair squashes onto that row's value only if $(g(x) - T_"in" (y)) + gamma (h(x) - T_"out" (y)) = 0$. The LHS is a non-zero polynomial of degree at most $1$ in $gamma$, and thus a random $gamma$ makes it zero with probability at most $1\/abs(FF)$.#s[This is via Schwartz-Zippel again, as in @identitytest.] By the union bound over all $N$ rows, a bad pair survives with probability at most $N\/abs(FF)$.#s[If $N$ is big, e.g. $2^16$ if $T$ covers all 16-bit integers, this bound is fairly weak, so we likely need to draw $gamma$ from an extension field for security.]
 
 #wideblock[#figure(
-  image("tuple_lookup_no_claims.svg", width: 100%),
+  image("figures/tuple_lookup_no_claims.svg", width: 100%),
   caption: [Proving $h = "ReLU"(g)$ for $g = [-1, 2, 0, 3]$ with $D=[-2, -1, 0, 1, 2, 3].$],
 ) <fig-tuple-lookup>]
 
@@ -560,7 +560,7 @@ Reed-Solomon codes are useful for us because they're *massively redundant*. Chan
 ]<rsdistance>
 
 
-#figure(image("pcs_rs_distance.svg", width: 100%),
+#figure(image("figures/pcs_rs_distance.svg", width: 100%),
   caption: [RS codewords of different rows agree at less than $W$ points, so a random position almost always tells them apart.]) <fig-pcs-rs-distance>
 With rate $rho=1/2$, two different rows' codewords differ in more than half their positions, meaning checking *a single random codeword cell has at least a 50% chance of telling them apart*.
 
@@ -590,7 +590,7 @@ To _commit_ to some table $g$, the prover does the following:
 3. Build a Merkle tree whose leaves are (hashes of) the _columns_ of $E$, and send the root to the verifier.
 
 #figure(
-  image("pcs_commit_steps.svg", width: 100%),
+  image("figures/pcs_commit_steps.svg", width: 100%),
   caption: [Committing to a table $g$ with Ligero-PC. The root of the Merkle tree is sent to the verifier.],
 ) <fig-pcs-commit-steps>
 
@@ -609,7 +609,7 @@ If all column checks pass, the opening is successful.
 
 
 #wideblock[#figure(
-  image("pcs_open_steps.svg", width: 100%),
+  image("figures/pcs_open_steps.svg", width: 100%),
   caption: [Interactively proving $tilde(g)(r) = v$ via a Ligero-PC opening.],
 ) <fig-pcs-open-steps>]
 
@@ -711,7 +711,7 @@ At the start of each proof, we'll have the prover generate a long list of fresh 
 
 
 #wideblock[#figure(
-  image("pad_value.svg", width: 100%),
+  image("figures/pad_value.svg", width: 100%),
   caption: [The prover sends a secret value plus a committed pad. The verifier can't check it directly, so it writes down a claim about the pads instead.],
 ) <fig-pad-value>]
 
@@ -831,7 +831,7 @@ Each of the challenges we've added along the way ($gamma$, $chi$ and the $kappa_
 *So all the verifier ever learns is that every claim about the pads holds.* That means we can make any of our tools zero-knowledge by masking every value it sends with pads, and leaving behind only claims about the pads instead of checks.
 
 #wideblock[#figure(
-  image("zk_chain.svg", width: 100%),
+  image("figures/zk_chain.svg", width: 100%),
 caption: [The proof from @fig-claim-chain, made fully zero-knowledge. Intermediate claims stay hidden, committed tables only get ZK openings (@maskedopenings), and everything leaves behind claims about the pads, which get proven together at the end.],
 ) <fig-zk-chain>]
 
@@ -857,7 +857,7 @@ $   P_(m concat u) (X)  = underbrace(P_m (X), "the row") + underbrace(X^W dot P_
 where $m concat u = [m_0, ..., m_(W - 1), u_0, ..., u_(tau - 1)]$ is the _concatenation_ of $m$ and $u$. So every row of $E$ is still a valid RS codeword, just of a row with $W + tau$ values instead of $W$. Linearity still holds, so the *column check still works*, and *the value check just ignores the tail*, folding only the first $W$ entries of the row the prover sends.
 
 #figure(
-  image("zk_commit.svg", width: 100%),
+  image("figures/zk_commit.svg", width: 100%),
   caption: [Committing to a table $g$, laid out as a matrix $G$, with a mask row $Z$ and random tails $u$.],
 ) <fig-zk-commit>
 
@@ -882,7 +882,7 @@ Before committing, we'll have the prover append an extra row#s[Technically a few
 
     
 #wideblock[#figure(
-  image("zk_open_steps.svg", width: 100%),
+  image("figures/zk_open_steps.svg", width: 100%),
   caption: [Interactively proving $tilde(g)(r) = v$ via a Ligero-PC opening with $G_r_"row"$ masked.],
 ) <fig-zk-open-steps>]
 
@@ -900,7 +900,7 @@ So far, every tool we've introduced requires the verifier to be in communication
 The idea is really simple: at any point where we'd normally wait for the verifier to send a random challenge, *just hash everything the verifier would have seen so far and use that as the challenge*. Anyone can later recompute the exact same hashes themselves, even if they weren't there at generation time.
 
 #wideblock[#figure(
-  image("fiat_shamir.svg", width: 100%),
+  image("figures/fiat_shamir.svg", width: 100%),
   caption: [Fiat-Shamir replaces each random challenge with a hash of everything sent so far.],
 ) <fig-fiat-shamir>]
 
@@ -959,7 +959,7 @@ $ product_(i = 1)^(log W) ((1 - r'_i) + r'_i dot z_c^(2^(i - 1))) $]]
 But step 4 is an opening too, which means sending a row again. The difference is that $eta$ is far smaller than $g$, so a row from it is much shorter. If it's still not small enough, *we can repeat this trick as many times as we need*, committing to $eta$'s row instead of sending it, opening that, etc etc.
 
 #wideblock[#figure(
-  image("recursive_open.svg", width: 100%),
+  image("figures/recursive_open.svg", width: 100%),
    caption: [A recursive opening of $g$, with three levels of recursion.],
 ) <fig-recursive-open>]
 
@@ -984,7 +984,7 @@ Some tables are ephemeral, committed only for one proof and then never used agai
 To trust a new commitment, the verifier has to check every link between it and the original. So rather than linking each new commitment to the one before it, which makes the path longer with each additional commitment, the *prover links all new commitments straight to the first one* (the _root_ commitment), which gets one big opening up front to show it's close to RS codewords, and serves as the table's single, permanent source of truth.
 
 #figure(
-  image("refresh_star.svg", width: 100%),
+  image("figures/refresh_star.svg", width: 100%),
   caption: [A root commitment and its refreshes.],
 ) <fig-refresh>
 
