@@ -1,0 +1,53 @@
+# Builds the site (web/build_site.py) and deploys it to GitHub Pages on every push to main. It's
+# served wherever GitHub says the repo's Pages site is (passed to build_site.py as SITE_URL).
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  TYPST_VERSION: 0.15.1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # The full history, so build_site.py can date the last change to the document.
+      - name: Install Typst
+        run: |
+          mkdir -p "$RUNNER_TEMP/typst"
+          curl -fsSL "https://github.com/typst/typst/releases/download/v$TYPST_VERSION/typst-x86_64-unknown-linux-musl.tar.xz" \
+            | tar -xJ -C "$RUNNER_TEMP/typst" --strip-components=1
+          echo "$RUNNER_TEMP/typst" >> "$GITHUB_PATH"
+      - id: pages
+        uses: actions/configure-pages@v5
+      - run: python3 web/build_site.py
+        env:
+          # Built from the host rather than base_url, which is http:// as HTTPS isn't enforced by GitHub.
+          SITE_URL: https://${{ steps.pages.outputs.host }}${{ steps.pages.outputs.base_path }}/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
