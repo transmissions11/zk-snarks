@@ -12,7 +12,6 @@ import os
 import re
 import shutil
 import subprocess
-from datetime import date
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -22,7 +21,6 @@ OUT = HERE / "site" / "index.html"
 FIGURES = OUT.parent / "figures"
 PREVIEW = OUT.parent / "hero.png"  # Made by hero.typ (see the top of it).
 SITE_URL = os.environ.get("SITE_URL")  # Where it's deployed, set by .github/workflows/pages.yml.
-CONTENT = ["main.typ", "template.typ", "figures"]  # Commits touching these move the "Last updated" date.
 
 SYMBOL = re.compile(r'<symbol id="([^"]+)"[^>]*>.*?</symbol>', re.S)
 
@@ -166,17 +164,21 @@ def add_share_tags(html):
     return html.replace("</head>", tags + "</head>", 1)
 
 
-def last_updated():
-    """The date of the last commit that changed the document, e.g. "October 22nd, 2026"."""
-    log = subprocess.run(["git", "log", "-1", "--format=%cs", "--", *CONTENT], cwd=ROOT, capture_output=True, text=True, check=True)
-    day = date.fromisoformat(log.stdout.strip())
-    suffix = "th" if 11 <= day.day <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day.day % 10, "th")
-    return f"{day:%B} {day.day}{suffix}, {day.year}"
+def repo_url():
+    """The repo on GitHub: GitHub Actions says which when deploying, and local builds use the origin
+    remote. None if neither says."""
+    if repo := os.environ.get("GITHUB_REPOSITORY"):
+        return f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{repo}"
+    remote = subprocess.run(["git", "remote", "get-url", "origin"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    m = re.fullmatch(r"(?:https://github\.com/|git@github\.com:)(.+?)(?:\.git)?", remote)
+    return f"https://github.com/{m[1]}" if m else None
 
 
-def add_footer_note(html):
-    """Say when the page was last updated, beside the author's name in the footer."""
-    note = f'<span class="pagefoot-note">Last updated {last_updated()}.</span>'
+def add_feedback_link(html):
+    """Point readers who spot a mistake at the repo, beside the author's name in the footer."""
+    if not (url := repo_url()):
+        return html
+    note = f'<span class="pagefoot-note">Spot an issue? Open an issue or pull request on <a href="{url}">GitHub</a>!</span>'
     html, n = re.subn(r'(<footer class="pagefoot">.*?)(</footer>)', lambda m: m[1] + note + m[2], html, count=1, flags=re.S)
     assert n == 1, "no footer to add the note to"
     return html
@@ -197,7 +199,7 @@ def main():
     )
     html = unwrap_note_paragraphs(keep_punctuation_with_maths(name_maths_refs(hide_maths_pictures(share_glyphs(OUT.read_text())))))
     check_sidenotes(html)
-    OUT.write_text(open_links_in_new_tabs(add_footer_note(add_share_tags(extract_figures(html)))))
+    OUT.write_text(open_links_in_new_tabs(add_feedback_link(add_share_tags(extract_figures(html)))))
     figures = list(FIGURES.iterdir())
     print(
         f"Wrote {OUT.relative_to(ROOT)} ({OUT.stat().st_size / 1e6:.1f} MB) and {len(figures)} figures "

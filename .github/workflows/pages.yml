@@ -24,8 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # The full history, so build_site.py can date the last change to the document.
       - name: Install Typst
         run: |
           mkdir -p "$RUNNER_TEMP/typst"
