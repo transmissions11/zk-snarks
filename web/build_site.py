@@ -178,7 +178,7 @@ def add_feedback_link(html):
     """Point readers who spot a mistake at the repo, beside the author's name in the footer."""
     if not (url := repo_url()):
         return html
-    note = f'<span class="pagefoot-note">Spot an issue? Open an issue or pull request on <a href="{url}">GitHub</a>!</span>'
+    note = f'<span class="pagefoot-note">Have feedback? Open an issue or pull request on <a href="{url}">GitHub</a>!</span>'
     html, n = re.subn(r'(<footer class="pagefoot">.*?)(</footer>)', lambda m: m[1] + note + m[2], html, count=1, flags=re.S)
     assert n == 1, "no footer to add the note to"
     return html
