@@ -12,7 +12,7 @@
   title: "ZK-SNARKs from the Ground Up",
   author: "Ben Mayer",
   description: "An attempt to explain how modern hash-based multilinear ZK-SNARKs work from the ground up.",
-  date: link("https://x.com/transmissions11", text(colors.cherry_red, "@transmissions11")), // Shown in place of the date.
+  date: link("https://xn--2-kmb.com/", text(colors.cherry_red, "2λ.com")),
   title_align: center,
   sidenotes: true,
   toc: true,
